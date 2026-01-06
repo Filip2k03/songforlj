@@ -68,14 +68,22 @@
 
         .features-grid {
             display: none; /* Hidden by default */
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            background: rgba(0,0,0,0.6);
-            padding: 10px;
-            border-radius: 15px;
-            backdrop-filter: blur(5px);
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            background: rgba(0,0,0,0.55);
+            padding: 12px;
+            border-radius: 14px;
+            backdrop-filter: blur(6px);
+            transform-origin: top right;
+            transition: transform 280ms cubic-bezier(.2,.9,.2,1), opacity 240ms;
+            opacity: 0;
         }
-        .features-grid.open { display: grid; }
+        .features-grid.open { display: grid; transform: translateY(6px) scale(1); opacity: 1; }
+
+        /* Top toolbar additions */
+        .top-toolbar { display:flex; gap:8px; align-items:center; }
+        .control-row { display:flex; gap:8px; align-items:center; }
+        .small-select { background: rgba(255,255,255,0.08); color: white; border: 1px solid rgba(255,255,255,0.12); padding:6px 8px; border-radius:8px; }
 
         .control-btn {
             background: rgba(255, 255, 255, 0.15);
@@ -122,6 +130,11 @@
             display: block;
             transform: translate(-50%, -50%) scale(1);
         }
+
+        /* Content card controls */
+        .card-controls { margin-top: 12px; display:flex; gap:8px; justify-content:center; align-items:center; }
+        .icon-btn { background: rgba(255,255,255,0.06); border: none; color: white; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+        .icon-btn:focus { outline: 2px solid rgba(255,105,180,0.45); }
 
         h1 {
             font-family: 'Great Vibes', cursive;
@@ -237,9 +250,16 @@
         <!-- Top Controls -->
         <div class="top-bar">
             <!-- Left: Quick Toggles -->
-            <div style="display: flex; gap: 8px;">
-                <button class="control-btn" onclick="toggleMenu()" title="Magic Menu">✨</button>
-                <button class="control-btn" onclick="toggleDayNight()" title="Day/Night" id="btn-daynight">☾</button>
+            <div class="top-toolbar" style="display: flex; gap: 8px;">
+                <div style="display:flex; gap:8px; align-items:center;" class="control-row">
+                    <button class="control-btn" onclick="toggleMenu()" title="Magic Menu" aria-label="Open features menu">✨</button>
+                    <button class="control-btn" onclick="toggleDayNight()" title="Day/Night" id="btn-daynight" aria-pressed="true">☾</button>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center; margin-left:8px;" class="control-row">
+                    <button class="control-btn" id="btn-play" onclick="togglePlay()" title="Play/Pause" aria-pressed="false">▶️</button>
+                    <button class="control-btn" onclick="photoMode()" title="Photo Mode" aria-label="Photo Mode">📸</button>
+                    <button class="control-btn" onclick="toggleFullscreen()" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
+                </div>
             </div>
 
             <!-- Right: Features Menu -->
@@ -262,10 +282,25 @@
         <div id="interaction-hint">Tap the Door, Mailbox, or Ground...</div>
         
         <!-- Main Content Card -->
-        <div id="content-card">
+        <div id="content-card" role="dialog" aria-modal="true" aria-hidden="true">
             <h1 id="card-title">Welcome</h1>
-            <div id="card-body" class="lyric-text">...</div>
-            <button class="action-btn" onclick="closeCard()">Close</button>
+            <div id="card-body" class="lyric-text" tabindex="0">...</div>
+
+            <div class="card-controls">
+                <button class="icon-btn" onclick="prevLyric()" aria-label="Previous lyric">◀</button>
+                <button class="icon-btn" id="btn-tts-toggle" onclick="toggleTTS()" aria-pressed="false">🔊</button>
+                <button class="icon-btn" onclick="nextLyric()" aria-label="Next lyric">▶</button>
+                <select id="voice-select" class="small-select" aria-label="Select voice"></select>
+            </div>
+
+            <div style="margin-top:10px; display:flex; gap:8px; justify-content:center; align-items:center;">
+                <input id="recipient-input" class="small-select" placeholder="Edit recipient name" aria-label="Edit recipient" />
+                <button class="icon-btn" onclick="saveRecipient()" aria-label="Save recipient">Save</button>
+            </div>
+
+            <div style="margin-top:12px; display:flex; gap:8px; justify-content:center;">
+                <button class="action-btn" onclick="closeCard()">Close</button>
+            </div>
         </div>
 
         <!-- Attribution -->
@@ -280,6 +315,9 @@
     <audio id="bg-music" loop>
         <source src="" type="audio/mp3">
     </audio>
+
+    <!-- Color picker for neon sign (hidden) -->
+    <input id="neon-color-picker" type="color" value="#ff6fb5" style="position:fixed;left:-9999px;top:auto;" aria-hidden="true">
 
     <script>
         // --- CONFIGURATION ---
@@ -338,6 +376,10 @@
         let danceGroup = null;
         let windStrength = 0.02;
         let signPulseInterval = null;
+        let neonBoardMesh = null;
+        let filipSignMesh = null;
+        let mistGroup = [];
+        let candleLights = [];
         
         // State
         let isNight = true;
@@ -396,6 +438,9 @@
             createFireflies();
             createFlowers();
             createLightBulb();
+            createNeonBoard(CONFIG.names.recipient, 0, 26, 18);
+            createFilipSign('Filip', -28, 18, 10);
+            createCandleLights();
             spawnStars();
             addWindowFrames();
 
@@ -421,7 +466,12 @@
             const hour = new Date().getHours();
             // Night if before 7am or after 6pm
             isNight = (hour < 7 || hour >= 18);
+            // load any saved scene state (recipient, toggles)
+            loadSceneState();
             applyDayNightState();
+
+            // populate TTS voices (some browsers fire onvoiceschanged)
+            populateVoices();
 
             animate();
         }
@@ -502,7 +552,7 @@
             roof.castShadow = true;
             houseGroup.add(roof);
 
-            // Sign
+            // Sign (we'll hide the original house sign in favor of the neon board)
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 128;
             const ctx = canvas.getContext('2d');
@@ -522,19 +572,30 @@
             );
             signMesh.position.set(0, 22, 13);
             signMesh.userData = { canvas, ctx, drawSignText };
+            // hide the legacy sign; we'll use the neon board instead
+            signMesh.visible = false;
             houseGroup.add(signMesh);
 
             // Door Group
             doorGroup = new THREE.Group();
             doorGroup.position.set(-5, 0, 12.6);
             
+            // Improved door: wood-like material with panels and knob
             doorMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(10, 18, 1),
-                new THREE.MeshStandardMaterial({ color: CONFIG.colors.door })
+                new THREE.MeshStandardMaterial({ color: CONFIG.colors.door, roughness:0.65, metalness:0.05 })
             );
             doorMesh.position.set(5, 9, 0);
             doorMesh.castShadow = true;
             doorMesh.userData = { isInteractable: true, type: 'door' };
+            // add panel decorations
+            const panelMat = new THREE.MeshStandardMaterial({ color: 0x7a3d2a, roughness:0.7 });
+            const p1 = new THREE.Mesh(new THREE.BoxGeometry(8.2,4.0,0.6), panelMat); p1.position.set(5,13.5,0.51); doorGroup.add(p1);
+            const p2 = new THREE.Mesh(new THREE.BoxGeometry(8.2,4.0,0.6), panelMat); p2.position.set(5,7,0.51); doorGroup.add(p2);
+            const p3 = new THREE.Mesh(new THREE.BoxGeometry(8.2,7.0,0.6), panelMat); p3.position.set(5,3.5,0.51); doorGroup.add(p3);
+            // knob (shiny)
+            const knob = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshStandardMaterial({ color: 0xffd700, metalness:0.9, roughness:0.15 }));
+            knob.position.set(8, 9, 0.6); doorGroup.add(knob);
             doorGroup.add(doorMesh);
 
             // Heart Decor
@@ -554,14 +615,6 @@
             doorHeart.position.set(5, 14, 0.6);
             doorMesh.add(doorHeart);
 
-            // Knob
-            const knob = new THREE.Mesh(
-                new THREE.SphereGeometry(0.8),
-                new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 })
-            );
-            knob.position.set(8, 9, 0.6);
-            doorMesh.add(knob);
-
             houseGroup.add(doorGroup);
             
             // Windows
@@ -572,20 +625,31 @@
         }
 
         function createWindow(x, y, z) {
+            // Frame
             const frame = new THREE.Mesh(
-                new THREE.BoxGeometry(6, 6, 0.5),
-                new THREE.MeshStandardMaterial({ color: 0x443333 })
+                new THREE.BoxGeometry(6.2, 6.2, 0.6),
+                new THREE.MeshStandardMaterial({ color: 0x332211 })
             );
             frame.position.set(x, y, z);
             houseGroup.add(frame);
 
-            const glass = new THREE.Mesh(
-                new THREE.BoxGeometry(5, 5, 0.6),
-                new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.9 })
-            );
-            glass.position.set(x, y, z);
+            // Glass (multi-pane)
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0xffffcc, transparent: true, opacity: 0.9, metalness:0.1, roughness:0.2 });
+            const glass = new THREE.Mesh(new THREE.BoxGeometry(5,5,0.4), glassMat);
+            glass.position.set(x, y, z+0.1);
             glass.userData = { isInteractable: true, type: 'window' };
             houseGroup.add(glass);
+
+            // Cross pane divider
+            const vert = new THREE.Mesh(new THREE.BoxGeometry(0.2,5,0.2), new THREE.MeshStandardMaterial({ color:0x443333 }));
+            vert.position.set(x, y, z+0.2); houseGroup.add(vert);
+            const hor = new THREE.Mesh(new THREE.BoxGeometry(5,0.2,0.2), new THREE.MeshStandardMaterial({ color:0x443333 }));
+            hor.position.set(x, y, z+0.2); houseGroup.add(hor);
+
+            // Shutters
+            const shutterL = new THREE.Mesh(new THREE.BoxGeometry(1.2,5.4,0.2), new THREE.MeshStandardMaterial({ color:0x4b2b2b }));
+            shutterL.position.set(x-3.2, y, z+0.1); houseGroup.add(shutterL);
+            const shutterR = shutterL.clone(); shutterR.position.set(x+3.2, y, z+0.1); houseGroup.add(shutterR);
         }
 
         function createChimney() {
@@ -664,15 +728,79 @@
 
         function createRainbow() {
             if(rainbowMesh) return;
-            const geo = new THREE.TorusGeometry(80, 2, 16, 100, Math.PI);
-            const mat = new THREE.MeshBasicMaterial({ 
-                color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.4 
-            });
-            // Vertex colors for rainbow gradient... (Simplified here as single color for brevity, usually needs shader or texture)
-            // Using a simple color for now
-            rainbowMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xadd8e6, transparent: true, opacity: 0.0 }));
-            rainbowMesh.position.set(0, -10, -50);
+            rainbowMesh = new THREE.Group();
+            const colors = [0xFF0000,0xFF7F00,0xFFFF00,0x00FF00,0x0000FF,0x4B0082,0x8F00FF];
+            for(let i=0;i<7;i++){
+                const r = 70 + i*2.8;
+                const geo = new THREE.TorusGeometry(r, 1.8, 16, 100, Math.PI);
+                const mat = new THREE.MeshBasicMaterial({ color: colors[i], transparent:true, opacity: 0.65 });
+                const arc = new THREE.Mesh(geo, mat);
+                arc.position.set(0, -6 + i*0.4, -50 - i*0.6);
+                arc.rotation.x = Math.PI * 0.05;
+                rainbowMesh.add(arc);
+            }
+            rainbowMesh.scale.set(1.0,1.0,1.0);
             scene.add(rainbowMesh);
+        }
+
+        // --- Neon / Name Boards ---
+        function createNeonBoard(text, x=0, y=20, z=10) {
+            if(neonBoardMesh) return;
+            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            ctx.font = 'bold 96px "Great Vibes", cursive';
+            ctx.textAlign = 'center'; ctx.textBaseline='middle';
+            // neon gradient
+            const grad = ctx.createLinearGradient(0,0,canvas.width,0);
+            grad.addColorStop(0,'#ff6fb5'); grad.addColorStop(1,'#ffd36b');
+            ctx.fillStyle = grad; ctx.fillText(text, canvas.width/2, canvas.height/2);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.MeshStandardMaterial({ map: tex, emissive: 0xff88cc, emissiveIntensity: 1.2, metalness: 0.1 });
+            const board = new THREE.Mesh(new THREE.PlaneGeometry(18,4), mat);
+            board.position.set(x,y,z); board.rotation.y = 0; board.renderOrder = 999;
+            board.userData = { isNeon:true };
+            // make interactive: allow color changing
+            board.userData.isInteractable = true; board.userData.type = 'neonboard';
+            neonBoardMesh = board; scene.add(board);
+            // subtle halo
+            const halo = new THREE.Mesh(new THREE.PlaneGeometry(22,6), new THREE.MeshBasicMaterial({ color:0xff88cc, transparent:true, opacity:0.06 }));
+            halo.position.set(x,y-0.6,z-0.1); scene.add(halo);
+        }
+
+        function changeNeonColorCycle() {
+            if(!neonBoardMesh) return;
+            const palette = ['#ff6fb5','#ffd36b','#6be1ff','#9bff88','#ff8ac1','#c78aff','#ffffff'];
+            const cur = neonBoardMesh.material.emissive.getHexString ? '#'+neonBoardMesh.material.emissive.getHexString() : '#ff6fb5';
+            let idx = palette.findIndex(c => c.toLowerCase() === cur.toLowerCase()); if(idx < 0) idx = 0; idx = (idx+1) % palette.length;
+            applyNeonColor(palette[idx]);
+        }
+
+        function openNeonColorPicker() {
+            const input = document.getElementById('neon-color-picker');
+            if(input) input.click();
+        }
+
+        function applyNeonColor(hex) {
+            if(!neonBoardMesh) return;
+            // update emissive color
+            try { neonBoardMesh.material.emissive.set(hex); } catch(e) {}
+            // redraw canvas text in that color
+            const map = neonBoardMesh.material.map;
+            const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+            const ctx = c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
+            ctx.font = 'bold 96px "Great Vibes", cursive'; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillStyle = hex; ctx.fillText(CONFIG.names.recipient, c.width/2, c.height/2);
+            map.image = c; map.needsUpdate = true;
+        }
+
+        function createFilipSign(text, x=-30, y=16, z=6) {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d'); ctx.font='bold 36px Playfair Display'; ctx.textAlign='center'; ctx.fillStyle='#ffd1e8'; ctx.fillText(text, 256,64);
+            const tex = new THREE.CanvasTexture(canvas);
+            const m = new THREE.Mesh(new THREE.BoxGeometry(8,2,0.5), new THREE.MeshStandardMaterial({ map: tex, emissive:0xffb6d5, emissiveIntensity:0.6 }));
+            m.position.set(x,y,z); filipSignMesh = m; scene.add(m);
         }
 
         // --- Additional Features (many small helpers) ---
@@ -681,6 +809,16 @@
             if(!signMesh || !signMesh.userData) return;
             signMesh.userData.drawSignText(text, color || '#3e2723');
             signMesh.material.map.needsUpdate = true;
+            // update neon board if present
+            if(neonBoardMesh && neonBoardMesh.material && neonBoardMesh.material.map) {
+                // create small canvas update
+                const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+                const ctx = c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height);
+                ctx.font = 'bold 96px "Great Vibes", cursive'; ctx.textAlign='center'; ctx.textBaseline='middle';
+                const grad = ctx.createLinearGradient(0,0,c.width,0); grad.addColorStop(0,'#ff6fb5'); grad.addColorStop(1,'#ffd36b');
+                ctx.fillStyle = grad; ctx.fillText(text, c.width/2, c.height/2);
+                neonBoardMesh.material.map.image = c; neonBoardMesh.material.map.needsUpdate = true;
+            }
         }
 
         function toggleSignGlow(enable) {
@@ -979,16 +1117,137 @@
 
                 // Save toggles to localStorage
                 function saveSceneState() {
-                    const s = { isNight, isRainingRoses, isSnowing, isCloudy, isAutoRotate };
-                    localStorage.setItem('songforlj_state', JSON.stringify(s));
+                            const s = { isNight, isRainingRoses, isSnowing, isCloudy, isAutoRotate, recipient: CONFIG.names.recipient };
+                            localStorage.setItem('songforlj_state', JSON.stringify(s));
                 }
 
                 function loadSceneState() {
                     try {
-                        const s = JSON.parse(localStorage.getItem('songforlj_state'));
-                        if(s) { isNight = s.isNight; isRainingRoses = s.isRainingRoses; isSnowing = s.isSnowing; isCloudy = s.isCloudy; isAutoRotate = s.isAutoRotate; applyDayNightState(); }
+                                const s = JSON.parse(localStorage.getItem('songforlj_state'));
+                                if(s) {
+                                    isNight = s.isNight; isRainingRoses = s.isRainingRoses; isSnowing = s.isSnowing; isCloudy = s.isCloudy; isAutoRotate = s.isAutoRotate;
+                                    if(s.recipient) { CONFIG.names.recipient = s.recipient; setSignText(s.recipient + ' LJ'); }
+                                    applyDayNightState();
+                                }
                     } catch(e){}
                 }
+
+                // --- New UI / UX helpers ---
+                let musicPlaying = false;
+                function togglePlay() {
+                    const a = document.getElementById('bg-music');
+                    const btn = document.getElementById('btn-play');
+                    if(!a) return;
+                    if(a.paused) { 
+                        a.play().then(()=>{ musicPlaying = true; btn.innerText = '⏸'; btn.setAttribute('aria-pressed','true'); }).catch((e)=>{ console.warn('Audio play failed:', e); });
+                    } else { 
+                        a.pause(); musicPlaying = false; btn.innerText = '▶️'; btn.setAttribute('aria-pressed','false'); 
+                    }
+                }
+
+                function toggleFullscreen() {
+                    const el = document.documentElement;
+                    if(!document.fullscreenElement) el.requestFullscreen?.(); else document.exitFullscreen?.();
+                }
+
+                function prevLyric() {
+                    if(currentLineIndex > 0) { currentLineIndex--; updateCardLine(); }
+                }
+                function nextLyric() {
+                    if(currentLineIndex < LYRICS.length - 1) { currentLineIndex++; updateCardLine(); }
+                }
+
+                function updateCardLine() {
+                    const display = document.getElementById('card-body');
+                    display.innerText = LYRICS[currentLineIndex] || '';
+                    // speak if TTS active
+                    const tbtn = document.getElementById('btn-tts-toggle');
+                    if(tbtn && tbtn.getAttribute('aria-pressed') === 'true') {
+                        try { 
+                            synth.cancel();
+                            const u = new SpeechSynthesisUtterance(LYRICS[currentLineIndex]);
+                            const sel = document.getElementById('voice-select');
+                            if(sel && sel.value) u.voice = synth.getVoices().find(v => v.name === sel.value) || null;
+                            u.onerror = (e) => { console.warn('TTS error:', e); };
+                            synth.speak(u);
+                        } catch(e) { console.warn('TTS failed:', e); }
+                    }
+                }
+
+                function toggleTTS() {
+                    const btn = document.getElementById('btn-tts-toggle');
+                    const on = btn.getAttribute('aria-pressed') === 'true';
+                    if(on) { btn.setAttribute('aria-pressed','false'); synth.cancel(); }
+                    else { btn.setAttribute('aria-pressed','true'); updateCardLine(); }
+                }
+
+                function populateVoices() {
+                    const sel = document.getElementById('voice-select');
+                    if(!sel || !synth) return;
+                    const voices = synth.getVoices();
+                    sel.innerHTML = '';
+                    voices.forEach(v=>{ const o = document.createElement('option'); o.value = v.name; o.innerText = v.name; sel.appendChild(o); });
+                    if(voices.length > 0) sel.value = voices[0].name;
+                }
+
+                function saveRecipient() {
+                    const inp = document.getElementById('recipient-input');
+                    if(!inp) return;
+                    const val = inp.value.trim();
+                    if(val.length > 0) {
+                        CONFIG.names.recipient = val;
+                        setSignText(val + ' LJ');
+                        saveSceneState();
+                        inp.value = '';
+                        showCard('Saved!');
+                        setTimeout(()=>{ closeCard(); }, 900);
+                    }
+                }
+
+                // Keyboard shortcuts
+                window.addEventListener('keydown', (e)=>{
+                    if(e.key === ' ' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); togglePlay(); }
+                    if(e.key === 'ArrowLeft') prevLyric();
+                    if(e.key === 'ArrowRight') nextLyric();
+                    if(e.key.toLowerCase() === 'f') toggleFullscreen();
+                    if(e.key.toLowerCase() === 'p') photoMode();
+                });
+
+                // Ensure voices populate when they become available
+                window.speechSynthesis.onvoiceschanged = populateVoices;
+
+                // Neon color picker hook
+                document.addEventListener('DOMContentLoaded', ()=>{
+                    const pick = document.getElementById('neon-color-picker');
+                    if(pick) pick.addEventListener('input', (e)=>{ applyNeonColor(e.target.value); });
+                });
+
+                // Global error handlers (show overlay with message)
+                window.addEventListener('error', (ev) => {
+                    const m = document.getElementById('debug-msg');
+                    if(m) { m.innerText = `${ev.message}\n at ${ev.filename}:${ev.lineno}:${ev.colno}`; document.getElementById('debug-overlay').style.display = 'block'; }
+                    console.error(ev.error || ev.message);
+                });
+                window.addEventListener('unhandledrejection', (ev)=>{
+                    const m = document.getElementById('debug-msg');
+                    if(m) { m.innerText = `Unhandled Promise Rejection:\n${ev.reason}`; document.getElementById('debug-overlay').style.display = 'block'; }
+                    console.error('Unhandled rejection', ev.reason);
+                });
+
+                // Double-click on canvas: open neon color picker when neon board double-clicked
+                window.addEventListener('dblclick', ()=>{
+                    try {
+                        raycaster.setFromCamera(mouse, camera);
+                        const ints = raycaster.intersectObjects(scene.children, true);
+                        if(ints.length > 0) {
+                            let obj = ints[0].object;
+                            while(obj) {
+                                if(obj.userData && obj.userData.type === 'neonboard') { openNeonColorPicker(); break; }
+                                obj = obj.parent;
+                            }
+                        }
+                    } catch(e) { console.warn('dblclick handler error', e); }
+                });
 
 
         // --- PARTICLE SYSTEMS ---
@@ -1025,14 +1284,23 @@
         }
 
         function spawnBirds() {
-            for(let i=0; i<5; i++) {
-                const geo = new THREE.ConeGeometry(0.5, 2, 4);
-                const mat = new THREE.MeshBasicMaterial({ color: 0x333333 });
-                const b = new THREE.Mesh(geo, mat);
-                b.rotation.x = Math.PI / 2;
-                b.position.set(-100 - i*2, 60 + Math.random()*5, -50 + i*2);
-                scene.add(b);
-                birds.push({ mesh: b, speed: 0.2 + Math.random()*0.1 });
+            // More realistic birds: body + two wing planes, simple flapping and flock movement
+            for(let i=0;i<8;i++){
+                const g = new THREE.Group();
+                // body
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,0.3), new THREE.MeshStandardMaterial({ color:0x222222 }));
+                body.position.set(0,0,0);
+                // left wing
+                const wingL = new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.4), new THREE.MeshStandardMaterial({ color:0x333333, side:THREE.DoubleSide }));
+                wingL.position.set(-0.15,0,0); wingL.rotation.y = Math.PI/6;
+                // right wing
+                const wingR = new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.4), new THREE.MeshStandardMaterial({ color:0x333333, side:THREE.DoubleSide }));
+                wingR.position.set(0.15,0,0); wingR.rotation.y = -Math.PI/6;
+                g.add(body); g.add(wingL); g.add(wingR);
+                g.position.set(-80 + Math.random()*40, 40 + Math.random()*20, -60 + Math.random()*40);
+                g.userData = { vel: new THREE.Vector3(0.2 + Math.random()*0.2, (Math.random()-0.5)*0.02, 0), flapSpeed: 0.02 + Math.random()*0.02, wingL, wingR };
+                scene.add(g);
+                birds.push(g);
             }
         }
 
@@ -1151,6 +1419,7 @@
             else if (type === 'mailbox') showLoveLetter();
             else if (type === 'lantern') toggleLantern(object);
             else if (type === 'window') toggleWindowLight(object);
+            else if (type === 'neonboard') handleNeonClick();
         }
 
         // --- ACTIONS ---
@@ -1197,6 +1466,12 @@
             mesh.parent.children.forEach(c => {
                 if(c.isPointLight) c.intensity = c.intensity > 0 ? 0 : 1;
             });
+        }
+
+        // Handle neon board click
+        function handleNeonClick() {
+            // cycle through palette on single click
+            changeNeonColorCycle();
         }
 
         function toggleWindowLight(mesh) {
@@ -1247,6 +1522,16 @@
                 }
             });
 
+            // Neon board control
+            if(neonBoardMesh && neonBoardMesh.material) {
+                neonBoardMesh.material.emissiveIntensity = isNight ? 1.6 : 0.0;
+                neonBoardMesh.visible = true;
+            }
+
+            if(filipSignMesh && filipSignMesh.material) {
+                filipSignMesh.material.emissiveIntensity = isNight ? 0.9 : 0.15;
+            }
+
             // UI button icon update
             const btn = document.getElementById('btn-daynight');
             if(btn) btn.innerText = isNight ? '☾' : '☀';
@@ -1293,6 +1578,39 @@
         }
         function toggleFog() {
             scene.fog.density = scene.fog.density > 0.01 ? 0.005 : 0.04;
+            // create soft mist planes when fog is thick
+            if(scene.fog.density > 0.02 && mistGroup.length === 0) createMist(18);
+            mistGroup.forEach(m => m.visible = scene.fog.density > 0.02);
+        }
+
+        // --- Candle lights ---
+        function createCandleLights() {
+            // place a few candles near the porch/door
+            const positions = [[-4,1,18],[2,1,18],[6,1,16]];
+            positions.forEach((p,i)=>{
+                const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,0.6), new THREE.MeshStandardMaterial({ color:0xfff1e0, roughness:0.8 }));
+                wax.position.set(p[0], p[1], p[2]);
+                scene.add(wax);
+
+                const flame = new THREE.Mesh(new THREE.SphereGeometry(0.12,8,8), new THREE.MeshBasicMaterial({ color:0xffcc66 }));
+                flame.position.set(p[0], p[1]+0.45, p[2]); scene.add(flame);
+
+                const light = new THREE.PointLight(0xffcc66, 0.8, 6, 2);
+                light.position.set(p[0], p[1]+0.45, p[2]); scene.add(light);
+                candleLights.push({ light, flame, baseY: flame.position.y, phase: Math.random()*10 });
+            });
+        }
+
+        function createMist(count = 12) {
+            for(let i=0;i<count;i++){
+                const g = new THREE.PlaneGeometry(40,6);
+                const mat = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0.06, side:THREE.DoubleSide });
+                const p = new THREE.Mesh(g, mat);
+                p.position.set((Math.random()-0.5)*120, 6 + Math.random()*6, -20 + Math.random()*80);
+                p.rotation.x = -Math.PI/2 + (Math.random()*0.02);
+                p.renderOrder = 10;
+                scene.add(p); mistGroup.push(p);
+            }
         }
         function changeLightColor() {
             lanterns.forEach(l => l.color.setHex(Math.random() * 0xffffff));
@@ -1302,7 +1620,9 @@
         function toggleRainbow() {
             if(!rainbowMesh) createRainbow();
             isRainbow = !isRainbow;
-            rainbowMesh.material.opacity = isRainbow ? 0.5 : 0.0;
+            if(rainbowMesh && rainbowMesh.children) {
+                rainbowMesh.children.forEach(c => { if(c.material) c.material.opacity = isRainbow ? 0.65 : 0.0; });
+            }
         }
 
         // --- ANIMATION LOOP ---
@@ -1365,11 +1685,38 @@
             }
 
             // Birds
+            // Birds: flock movement + wing flap
             birds.forEach(b => {
-                b.mesh.position.x += b.speed;
-                b.mesh.position.y += Math.sin(Date.now()*0.002)*0.05;
-                if(b.mesh.position.x > 100) b.mesh.position.x = -100;
+                // b can be Group (new) or old-style object
+                if(b.mesh) {
+                    b.mesh.position.x += b.speed;
+                    b.mesh.position.y += Math.sin(Date.now()*0.002)*0.05;
+                    if(b.mesh.position.x > 100) b.mesh.position.x = -100;
+                } else {
+                    // Group style
+                    const vel = b.userData.vel;
+                    b.position.add(vel);
+                    // gentle sine bob
+                    b.position.y += Math.sin(Date.now()*0.002 + (b.userData.phase||0))*0.02;
+                    // wrap
+                    if(b.position.x > 120) b.position.x = -120;
+                    // flap wings
+                    const t = Date.now()*0.002 * b.userData.flapSpeed*30;
+                    const a = Math.sin(t) * 0.8;
+                    b.userData.wingL.rotation.z = 0.2 + a;
+                    b.userData.wingR.rotation.z = -0.2 - a;
+                }
             });
+
+            // Candle flicker
+            if(candleLights.length > 0) {
+                const now = Date.now()*0.002;
+                candleLights.forEach((c, i) => {
+                    const v = 0.6 + Math.abs(Math.sin(now*2 + c.phase))*0.4 + (Math.random()*0.03);
+                    c.light.intensity = v;
+                    c.flame.position.y = c.baseY + Math.sin(now*5 + c.phase)*0.02;
+                });
+            }
 
             // Clouds
             clouds.forEach(c => {
@@ -1440,7 +1787,7 @@
         function startSong() {
             isPlaying = true;
             currentLineIndex = 0;
-            speakNextLine();
+            try { speakNextLine(); } catch(e) { console.warn('startSong error:', e); }
         }
 
         function stopExperience() {
@@ -1460,23 +1807,32 @@
                 display.style.opacity = 1;
             }, 300);
 
-            const u = new SpeechSynthesisUtterance(text);
-            u.pitch = 1; u.rate = 0.9; u.volume = 1;
-            const voices = synth.getVoices();
-            const v = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha"));
-            if(v) u.voice = v;
+            try {
+                const u = new SpeechSynthesisUtterance(text);
+                u.pitch = 1; u.rate = 0.9; u.volume = 1;
+                const voices = synth.getVoices();
+                const v = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha"));
+                if(v) u.voice = v;
 
-            u.onend = () => {
-                currentLineIndex++;
-                if(isPlaying) setTimeout(speakNextLine, 800);
-            };
+                u.onend = () => {
+                    currentLineIndex++;
+                    if(isPlaying) setTimeout(speakNextLine, 800);
+                };
+                u.onerror = (e) => { console.warn('TTS onend error:', e); };
 
-            synth.speak(u);
+                synth.speak(u);
+            } catch(e) { console.warn('speakNextLine error:', e); }
         }
 
         // Init
         window.onload = init;
 
     </script>
+    <!-- Debug overlay -->
+    <div id="debug-overlay" style="position:fixed;left:12px;bottom:12px;background:rgba(0,0,0,0.7);color:#ffb6d5;padding:10px;border-radius:8px;z-index:9999;max-width:380px;font-family:monospace;display:none;">
+        <strong>Error:</strong>
+        <div id="debug-msg" style="margin-top:6px;white-space:pre-wrap;color:#ffdede;font-size:0.9rem;"></div>
+        <button onclick="document.getElementById('debug-overlay').style.display='none'" style="margin-top:6px;padding:6px;border-radius:6px;background:#222;color:#fff;border:none;cursor:pointer;">Dismiss</button>
+    </div>
 </body>
 </html>
