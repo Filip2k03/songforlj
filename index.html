@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Kyal Sin Htet's Romantic Home</title>
     <!-- Three.js Core -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- OrbitControls for looking around -->
+    <!-- OrbitControls -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;600&family=Great+Vibes&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
     
     <style>
         /* --- CSS Reset & Base --- */
-        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
 
         body {
             overflow: hidden;
@@ -22,6 +22,7 @@
             color: white;
             height: 100vh;
             width: 100vw;
+            touch-action: none; /* Prevent scroll on mobile */
         }
 
         /* --- 3D Canvas --- */
@@ -53,27 +54,51 @@
             width: 100%;
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             pointer-events: auto;
-            padding: 20px;
+            padding: 10px;
         }
 
-        .control-btn {
-            background: rgba(255, 255, 255, 0.1);
+        .menu-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .features-grid {
+            display: none; /* Hidden by default */
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            background: rgba(0,0,0,0.6);
+            padding: 10px;
+            border-radius: 15px;
             backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .features-grid.open { display: grid; }
+
+        .control-btn {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
             color: white;
-            padding: 10px 15px;
+            width: 45px; height: 45px;
             border-radius: 50%;
             cursor: pointer;
             font-size: 1.2rem;
             transition: all 0.3s;
-            margin: 0 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
+        .control-btn.active { background: #ff69b4; border-color: #ff69b4; }
         .control-btn:hover { background: rgba(255, 105, 180, 0.6); transform: scale(1.1); }
+        .control-btn.small { width: 35px; height: 35px; font-size: 0.9rem; border-radius: 8px; }
 
         /* The Lyrics/Main Card */
         #content-card {
-            background: rgba(20, 10, 20, 0.7);
+            background: rgba(20, 10, 20, 0.85);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 192, 203, 0.3);
             border-radius: 20px;
@@ -84,12 +109,12 @@
             width: 90%;
             opacity: 0;
             transform: translateY(50px) scale(0.9);
-            transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: auto;
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(0.9);
-            display: none; /* Hidden by default */
+            display: none;
         }
 
         #content-card.visible {
@@ -100,7 +125,7 @@
 
         h1 {
             font-family: 'Great Vibes', cursive;
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             background: linear-gradient(to right, #ff9a9e, #fecfef);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -110,8 +135,8 @@
 
         .lyric-text {
             font-family: 'Playfair Display', serif;
-            font-size: 1.3rem;
-            min-height: 3em;
+            font-size: 1.2rem;
+            min-height: 4em;
             color: #fff0f5;
             margin: 15px 0;
             font-style: italic;
@@ -126,35 +151,32 @@
             text-align: right;
             pointer-events: auto;
             font-family: 'Playfair Display', serif;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
-        .attribution small {
-            display: block;
-            color: rgba(255,255,255,0.6);
-            font-size: 0.8rem;
-            letter-spacing: 1px;
-        }
-        .attribution strong {
-            color: #ff69b4;
-            font-size: 1.1rem;
-        }
+        .attribution small { display: block; color: rgba(255,255,255,0.8); font-size: 0.8rem; letter-spacing: 1px; }
+        .attribution strong { color: #ff69b4; font-size: 1.1rem; }
 
         /* Instruction Tooltip */
         #interaction-hint {
             position: absolute;
-            bottom: 15%;
-            font-size: 1.1rem;
-            color: rgba(255, 255, 255, 0.9);
-            background: rgba(0,0,0,0.4);
-            padding: 8px 20px;
-            border-radius: 20px;
+            bottom: 12%;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.95);
+            background: rgba(0,0,0,0.6);
+            padding: 10px 25px;
+            border-radius: 30px;
             pointer-events: none;
             transition: opacity 0.5s;
             animation: pulse 2s infinite;
+            backdrop-filter: blur(4px);
+            text-align: center;
+            width: 80%;
+            max-width: 400px;
         }
 
         /* Buttons */
         .action-btn {
-            padding: 10px 25px;
+            padding: 12px 30px;
             background: linear-gradient(45deg, #ff6b6b, #ff8e53);
             border: none;
             color: white;
@@ -163,6 +185,7 @@
             font-weight: 600;
             box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
             transition: transform 0.2s;
+            font-size: 1rem;
         }
         .action-btn:hover { transform: translateY(-2px); }
 
@@ -186,27 +209,59 @@
             font-size: 2rem;
             transition: opacity 1s;
         }
+
+        /* --- Mobile Responsive Styles --- */
+        @media (max-width: 600px) {
+            h1 { font-size: 2rem; }
+            .lyric-text { font-size: 1rem; }
+            #content-card { padding: 20px; width: 95%; }
+            .control-btn { width: 40px; height: 40px; }
+            .attribution { bottom: 10px; right: 10px; }
+            .attribution small { font-size: 0.7rem; }
+            .attribution strong { font-size: 1rem; }
+            #interaction-hint { bottom: 15%; font-size: 0.9rem; padding: 8px 15px; }
+            
+            /* Better touch targets for mobile */
+            .control-btn.small { width: 40px; height: 40px; margin: 5px; } 
+            .features-grid { grid-template-columns: repeat(3, 1fr); width: 200px; }
+        }
     </style>
 </head>
 <body>
 
-    <div id="loader">Building Love Square...</div>
+    <div id="loader">Building Your Love...</div>
 
     <div id="canvas-container"></div>
 
     <div id="ui-layer">
         <!-- Top Controls -->
         <div class="top-bar">
-            <div>
-                <button class="control-btn" onclick="toggleDayNight()" title="Toggle Day/Night">☀/☾</button>
-                <button class="control-btn" onclick="toggleRain()" title="Rose Rain">🌹</button>
+            <!-- Left: Quick Toggles -->
+            <div style="display: flex; gap: 8px;">
+                <button class="control-btn" onclick="toggleMenu()" title="Magic Menu">✨</button>
+                <button class="control-btn" onclick="toggleDayNight()" title="Day/Night" id="btn-daynight">☾</button>
+            </div>
+
+            <!-- Right: Features Menu -->
+            <div class="menu-container">
+                <div id="features-menu" class="features-grid">
+                    <button class="control-btn small" onclick="toggleRain()" title="Rose Rain">🌹</button>
+                    <button class="control-btn small" onclick="toggleSnow()" title="Winter Mode">❄️</button>
+                    <button class="control-btn small" onclick="toggleClouds()" title="Clouds">☁️</button>
+                    <button class="control-btn small" onclick="launchFireworkManual()" title="Firework">🎆</button>
+                    <button class="control-btn small" onclick="toggleAutoRotate()" title="Auto Rotate">🔄</button>
+                    <button class="control-btn small" onclick="toggleFog()" title="Mist">🌫️</button>
+                    <button class="control-btn small" onclick="changeLightColor()" title="Disco Lights">💡</button>
+                    <button class="control-btn small" onclick="spawnBirds()" title="Birds">🕊️</button>
+                    <button class="control-btn small" onclick="toggleRainbow()" title="Rainbow">🌈</button>
+                </div>
             </div>
         </div>
 
         <!-- Hint -->
-        <div id="interaction-hint">Explore the garden... Click the Door or Mailbox</div>
+        <div id="interaction-hint">Tap the Door, Mailbox, or Ground...</div>
         
-        <!-- Main Content Card (Lyrics or Letter) -->
+        <!-- Main Content Card -->
         <div id="content-card">
             <h1 id="card-title">Welcome</h1>
             <div id="card-body" class="lyric-text">...</div>
@@ -215,8 +270,8 @@
 
         <!-- Attribution -->
         <div class="attribution">
-            <small>Specially crafted for <b>Kyal Sin Htet</b></small>
-            <small>With all my love,</small>
+            <small>For <b>Kyal Sin Htet</b></small>
+            <small>From</small>
             <strong>Stephan Filip</strong>
         </div>
     </div>
@@ -236,6 +291,7 @@
                 roof: 0xdb7093,
                 door: 0x8b4513,
                 grass: 0x1a2b1a,
+                snow: 0xffffff,
                 path: 0x555555
             },
             names: {
@@ -261,19 +317,28 @@
 
         // --- GLOBAL VARIABLES ---
         let scene, camera, renderer, controls;
-        let houseGroup, doorGroup, doorMesh, mailboxMesh;
+        let houseGroup, doorGroup, doorMesh, mailboxMesh, grassMesh;
         let raycaster, mouse;
-        let particles, roseParticles = [];
-        let fireflies = [];
+        let clock = new THREE.Clock();
+        
+        // Systems
+        let roseParticles = [], fireflies = [], snowParticles = [], smokeParticles = [], clouds = [], birds = [], fireworks = [];
+        let lanterns = [], flowers = [];
+        
+        // State
         let isNight = true;
         let isRainingRoses = false;
-        let lanterns = [];
+        let isSnowing = false;
+        let isAutoRotate = false;
+        let isCloudy = false;
+        let isWinter = false;
+        let isRainbow = false;
+        let rainbowMesh;
         
         // Audio/TTS
         let synth = window.speechSynthesis;
         let currentLineIndex = 0;
         let isPlaying = false;
-        let isReadingLetter = false;
 
         // --- INIT ---
         function init() {
@@ -289,8 +354,9 @@
             camera.position.set(0, 20, 90);
 
             // Renderer
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Optimise for mobile
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             container.appendChild(renderer.domElement);
@@ -299,9 +365,11 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't go below ground
-            controls.minDistance = 30;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.minDistance = 20;
             controls.maxDistance = 150;
+            controls.autoRotate = false;
+            controls.autoRotateSpeed = 1.0;
 
             // Lighting
             setupLights();
@@ -309,150 +377,155 @@
             // Objects
             createGroundAndPath();
             createHeartHouse();
-            createEnvironment(); // Trees, Mailbox, Lanterns
+            createEnvironment(); 
+            createChimney();
             createFireflies();
+            createFlowers();
 
             // Interaction
             raycaster = new THREE.Raycaster();
             mouse = new THREE.Vector2();
+            
+            // Event Listeners
             window.addEventListener('resize', onWindowResize);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('click', onMouseClick);
-            // Touch support for mobile
-            window.addEventListener('touchstart', (e) => {
-                mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
-                mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
-                checkIntersection();
-            });
+            
+            // Touch Support
+            const canvas = renderer.domElement;
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
 
-            // Start Loop
-            document.getElementById('loader').style.opacity = 0;
-            setTimeout(() => document.getElementById('loader').remove(), 1000);
+            // Remove Loader
+            const loader = document.getElementById('loader');
+            loader.style.opacity = 0;
+            setTimeout(() => loader.remove(), 1000);
+
             animate();
         }
 
-        // --- 3D CONSTRUCTION FUNCTIONS ---
+        // --- 3D CONSTRUCTION ---
 
         function setupLights() {
-            // Ambient
             const ambient = new THREE.AmbientLight(0xffffff, 0.2);
             scene.add(ambient);
 
-            // Moon/Sun Light
             const dirLight = new THREE.DirectionalLight(0xaaccff, 0.5);
             dirLight.position.set(50, 100, 50);
             dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048;
-            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.mapSize.width = 1024; // Lower res for mobile perf
+            dirLight.shadow.mapSize.height = 1024;
             dirLight.name = "MainLight";
             scene.add(dirLight);
 
-            // Warm house glow
             const pointLight = new THREE.PointLight(0xffaa00, 1, 40);
             pointLight.position.set(0, 15, 15);
             pointLight.castShadow = true;
+            pointLight.name = "PorchLight";
             scene.add(pointLight);
         }
 
         function createGroundAndPath() {
-            // Grass
             const planeGeo = new THREE.PlaneGeometry(500, 500);
             const planeMat = new THREE.MeshStandardMaterial({ 
                 color: CONFIG.colors.grass, 
                 roughness: 1,
                 side: THREE.DoubleSide
             });
-            const ground = new THREE.Mesh(planeGeo, planeMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            scene.add(ground);
+            grassMesh = new THREE.Mesh(planeGeo, planeMat);
+            grassMesh.rotation.x = -Math.PI / 2;
+            grassMesh.receiveShadow = true;
+            grassMesh.userData = { isInteractable: true, type: 'ground' };
+            scene.add(grassMesh);
 
-            // Cobblestone Path (Procedural Strip)
             const pathGeo = new THREE.PlaneGeometry(12, 80);
-            const pathMat = new THREE.MeshStandardMaterial({ 
-                color: 0x444444, 
-                roughness: 0.8 
-            });
+            const pathMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.path, roughness: 0.8 });
             const path = new THREE.Mesh(pathGeo, pathMat);
             path.rotation.x = -Math.PI / 2;
-            path.position.set(0, 0.1, 50); // Slightly above grass, leading to door
+            path.position.set(0, 0.1, 50);
             path.receiveShadow = true;
             scene.add(path);
-        }
 
-        // Helper to create text texture
-        function createTextTexture(text, bgColor = "rgba(0,0,0,0)", textColor = "#5d4037") {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 128;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = bgColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.font = 'bold 50px "Playfair Display", serif';
-            ctx.fillStyle = textColor;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-            return new THREE.CanvasTexture(canvas);
+            // Path Lights
+            for(let z=20; z<80; z+=15) {
+                const l1 = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffffaa}));
+                l1.position.set(-7, 0.5, z);
+                scene.add(l1);
+                const l2 = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({color: 0xffffaa}));
+                l2.position.set(7, 0.5, z);
+                scene.add(l2);
+            }
         }
 
         function createHeartHouse() {
             houseGroup = new THREE.Group();
 
-            // 1. Main Structure
-            const wallsGeo = new THREE.BoxGeometry(30, 25, 25);
-            const wallsMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.houseWall });
-            const walls = new THREE.Mesh(wallsGeo, wallsMat);
+            // Walls
+            const walls = new THREE.Mesh(
+                new THREE.BoxGeometry(30, 25, 25),
+                new THREE.MeshStandardMaterial({ color: CONFIG.colors.houseWall })
+            );
             walls.position.y = 12.5;
             walls.castShadow = true;
             walls.receiveShadow = true;
             houseGroup.add(walls);
 
-            // 2. Roof
-            const roofGeo = new THREE.ConeGeometry(24, 15, 4);
-            const roofMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.roof });
-            const roof = new THREE.Mesh(roofGeo, roofMat);
+            // Roof
+            const roof = new THREE.Mesh(
+                new THREE.ConeGeometry(24, 15, 4),
+                new THREE.MeshStandardMaterial({ color: CONFIG.colors.roof })
+            );
             roof.position.y = 32.5;
             roof.rotation.y = Math.PI / 4;
             roof.castShadow = true;
             houseGroup.add(roof);
 
-            // 3. Name Sign (Kyal Sin Htet)
-            const signGeo = new THREE.BoxGeometry(16, 4, 1);
-            const signTex = createTextTexture(CONFIG.names.recipient, "#d2b48c", "#3e2723");
-            const signMat = new THREE.MeshStandardMaterial({ map: signTex });
-            const sign = new THREE.Mesh(signGeo, signMat);
-            sign.position.set(0, 22, 13); // Above door
+            // Sign
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = "rgba(0,0,0,0)";
+            ctx.fillRect(0,0,512,128);
+            ctx.font = 'bold 50px "Playfair Display"';
+            ctx.fillStyle = "#3e2723";
+            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.fillText(CONFIG.names.recipient, 256, 64);
+            const signTex = new THREE.CanvasTexture(canvas);
+            
+            const sign = new THREE.Mesh(
+                new THREE.BoxGeometry(18, 4, 1),
+                new THREE.MeshStandardMaterial({ map: signTex, color: 0xffffff })
+            );
+            sign.position.set(0, 22, 13);
             houseGroup.add(sign);
 
-            // 4. Door Group
+            // Door Group
             doorGroup = new THREE.Group();
             doorGroup.position.set(-5, 0, 12.6);
             
-            const doorGeo = new THREE.BoxGeometry(10, 18, 1);
-            const doorMat = new THREE.MeshStandardMaterial({ color: CONFIG.colors.door });
-            doorMesh = new THREE.Mesh(doorGeo, doorMat);
+            doorMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(10, 18, 1),
+                new THREE.MeshStandardMaterial({ color: CONFIG.colors.door })
+            );
             doorMesh.position.set(5, 9, 0);
             doorMesh.castShadow = true;
             doorMesh.userData = { isInteractable: true, type: 'door' };
             doorGroup.add(doorMesh);
 
-            // Heart on Door
+            // Heart Decor
             const heartShape = new THREE.Shape();
-            const x = 0, y = 0;
-            heartShape.moveTo(x + 2.5, y + 2.5);
-            heartShape.bezierCurveTo(x + 2.5, y + 2.5, x + 2.0, y, x, y);
-            heartShape.bezierCurveTo(x - 3.0, y, x - 3.0, y + 3.5, x - 3.0, y + 3.5);
-            heartShape.bezierCurveTo(x - 3.0, y + 5.5, x - 1.0, y + 7.7, x + 2.5, y + 9.5);
-            heartShape.bezierCurveTo(x + 6.0, y + 7.7, x + 8.0, y + 5.5, x + 8.0, y + 3.5);
-            heartShape.bezierCurveTo(x + 8.0, y + 3.5, x + 8.0, y, x + 5.0, y);
-            heartShape.bezierCurveTo(x + 3.5, y, x + 2.5, y + 2.5, x + 2.5, y + 2.5);
+            heartShape.moveTo(25, 25);
+            heartShape.bezierCurveTo(25, 25, 20, 0, 0, 0);
+            heartShape.bezierCurveTo(-30, 0, -30, 35, -30, 35);
+            heartShape.bezierCurveTo(-30, 55, -10, 77, 25, 95);
+            heartShape.bezierCurveTo(60, 77, 80, 55, 80, 35);
+            heartShape.bezierCurveTo(80, 35, 80, 0, 50, 0);
+            heartShape.bezierCurveTo(35, 0, 25, 25, 25, 25);
             
-            const heartGeo = new THREE.ExtrudeGeometry(heartShape, { depth: 0.5, bevelEnabled: false });
+            const heartGeo = new THREE.ExtrudeGeometry(heartShape, { depth: 5, bevelEnabled: false });
             const heartMat = new THREE.MeshBasicMaterial({ color: 0xff69b4 });
             const doorHeart = new THREE.Mesh(heartGeo, heartMat);
-            doorHeart.scale.set(0.4, -0.4, 0.4);
-            doorHeart.position.set(3, 13, 0.6);
+            doorHeart.scale.set(0.04, -0.04, 0.04);
+            doorHeart.position.set(5, 14, 0.6);
             doorMesh.add(doorHeart);
 
             // Knob
@@ -464,240 +537,337 @@
             doorMesh.add(knob);
 
             houseGroup.add(doorGroup);
+            
+            // Windows
+            createWindow(-8, 15, 12.6);
+            createWindow(8, 15, 12.6);
+
             scene.add(houseGroup);
         }
 
-        function createEnvironment() {
-            // 1. Mailbox
-            const postGeo = new THREE.CylinderGeometry(0.5, 0.5, 10);
-            const postMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-            const post = new THREE.Mesh(postGeo, postMat);
-            post.position.set(15, 5, 40);
-            post.castShadow = true;
-            scene.add(post);
+        function createWindow(x, y, z) {
+            const frame = new THREE.Mesh(
+                new THREE.BoxGeometry(6, 6, 0.5),
+                new THREE.MeshStandardMaterial({ color: 0x443333 })
+            );
+            frame.position.set(x, y, z);
+            houseGroup.add(frame);
 
-            const boxGeo = new THREE.BoxGeometry(4, 3, 6);
-            const boxMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
-            mailboxMesh = new THREE.Mesh(boxGeo, boxMat);
+            const glass = new THREE.Mesh(
+                new THREE.BoxGeometry(5, 5, 0.6),
+                new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.9 })
+            );
+            glass.position.set(x, y, z);
+            glass.userData = { isInteractable: true, type: 'window' };
+            houseGroup.add(glass);
+        }
+
+        function createChimney() {
+            const chimney = new THREE.Mesh(
+                new THREE.BoxGeometry(4, 8, 4),
+                new THREE.MeshStandardMaterial({ color: 0x555555 })
+            );
+            chimney.position.set(8, 30, -5);
+            houseGroup.add(chimney);
+        }
+
+        function createEnvironment() {
+            // Mailbox
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 10), new THREE.MeshStandardMaterial({ color: 0x8b4513 }));
+            post.position.set(15, 5, 40); scene.add(post);
+
+            mailboxMesh = new THREE.Mesh(new THREE.BoxGeometry(4, 3, 6), new THREE.MeshStandardMaterial({ color: 0xcc0000 }));
             mailboxMesh.position.set(15, 10, 40);
-            mailboxMesh.castShadow = true;
             mailboxMesh.userData = { isInteractable: true, type: 'mailbox' };
             scene.add(mailboxMesh);
 
-            // 2. Lanterns
+            // Lanterns
             const positions = [[-10, 30], [10, 30], [-10, 60], [10, 60]];
             positions.forEach(pos => {
-                const lanternGroup = new THREE.Group();
-                lanternGroup.position.set(pos[0], 0, pos[1]);
+                const lg = new THREE.Group();
+                lg.position.set(pos[0], 0, pos[1]);
                 
-                const pole = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.3, 0.3, 8),
-                    new THREE.MeshStandardMaterial({ color: 0x222222 })
-                );
-                pole.position.y = 4;
-                lanternGroup.add(pole);
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 8), new THREE.MeshStandardMaterial({color: 0x222222}));
+                pole.position.y = 4; lg.add(pole);
 
-                const glass = new THREE.Mesh(
-                    new THREE.BoxGeometry(2, 3, 2),
-                    new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.8 })
-                );
-                glass.position.y = 8;
-                glass.userData = { isInteractable: true, type: 'lantern' };
-                lanternGroup.add(glass);
+                const glass = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2), new THREE.MeshBasicMaterial({color: 0xffffaa, opacity: 0.8, transparent: true}));
+                glass.position.y = 8; glass.userData = {isInteractable:true, type:'lantern'}; lg.add(glass);
 
-                // Point light inside lantern
                 const light = new THREE.PointLight(0xffaa00, 0.8, 15);
-                light.position.y = 8;
-                lanternGroup.add(light);
-                lanterns.push(light); // Store to animate later
-
-                scene.add(lanternGroup);
+                light.position.y = 8; lg.add(light);
+                lanterns.push(light);
+                scene.add(lg);
             });
 
-            // 3. Low Poly Trees
+            // Trees
             for(let i=0; i<8; i++) {
                 const tree = new THREE.Group();
-                const trunk = new THREE.Mesh(
-                    new THREE.CylinderGeometry(1, 1.5, 5),
-                    new THREE.MeshStandardMaterial({ color: 0x5d4037 })
-                );
-                trunk.position.y = 2.5;
-                trunk.castShadow = true;
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.5, 5), new THREE.MeshStandardMaterial({color: 0x5d4037}));
+                trunk.position.y = 2.5; tree.add(trunk);
                 
-                const leaves = new THREE.Mesh(
-                    new THREE.ConeGeometry(6, 12, 8),
-                    new THREE.MeshStandardMaterial({ color: 0x2d5a27 })
-                );
-                leaves.position.y = 8;
-                leaves.castShadow = true;
-
-                tree.add(trunk);
-                tree.add(leaves);
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(6, 12, 8), new THREE.MeshStandardMaterial({color: 0x2d5a27}));
+                leaves.position.y = 8; tree.add(leaves);
                 
-                // Random position away from path
                 const angle = Math.random() * Math.PI * 2;
-                const radius = 40 + Math.random() * 60;
-                tree.position.set(Math.cos(angle)*radius, 0, Math.sin(angle)*radius);
-                // Keep front clear
+                const r = 40 + Math.random() * 60;
+                tree.position.set(Math.cos(angle)*r, 0, Math.sin(angle)*r);
                 if (Math.abs(tree.position.x) < 15 && tree.position.z > 0) tree.position.x += 30;
-
                 scene.add(tree);
             }
         }
 
-        function createFireflies() {
-            const geometry = new THREE.BufferGeometry();
-            const vertices = [];
-            for (let i = 0; i < 100; i++) {
-                vertices.push(
-                    (Math.random() - 0.5) * 200,
-                    Math.random() * 50,
-                    (Math.random() - 0.5) * 200
-                );
+        function createFlowers() {
+            const geo = new THREE.PlaneGeometry(1, 1);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff69b4, side: THREE.DoubleSide });
+            
+            for(let i=0; i<50; i++) {
+                const flower = new THREE.Mesh(geo, mat);
+                const r = 20 + Math.random() * 60;
+                const theta = Math.random() * Math.PI * 2;
+                flower.position.set(Math.cos(theta)*r, 0.5, Math.sin(theta)*r);
+                flower.rotation.y = Math.random() * Math.PI;
+                flower.rotation.x = -0.2; // Tilt slightly up
+                
+                // Avoid path
+                if(Math.abs(flower.position.x) > 8 || flower.position.z < 0) {
+                    scene.add(flower);
+                    flowers.push(flower);
+                }
             }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            const material = new THREE.PointsMaterial({ color: 0xffff00, size: 0.5, transparent: true });
-            const points = new THREE.Points(geometry, material);
-            scene.add(points);
-            fireflies.push(points);
         }
 
-        // --- INTERACTION LOGIC ---
+        function createRainbow() {
+            if(rainbowMesh) return;
+            const geo = new THREE.TorusGeometry(80, 2, 16, 100, Math.PI);
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff, vertexColors: true, transparent: true, opacity: 0.4 
+            });
+            // Vertex colors for rainbow gradient... (Simplified here as single color for brevity, usually needs shader or texture)
+            // Using a simple color for now
+            rainbowMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xadd8e6, transparent: true, opacity: 0.0 }));
+            rainbowMesh.position.set(0, -10, -50);
+            scene.add(rainbowMesh);
+        }
+
+        // --- PARTICLE SYSTEMS ---
+
+        function createFireflies() {
+            const geo = new THREE.BufferGeometry();
+            const pos = [];
+            for (let i = 0; i < 50; i++) pos.push((Math.random()-0.5)*150, Math.random()*40, (Math.random()-0.5)*150);
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({ color: 0xffff00, size: 0.8, transparent: true });
+            const pts = new THREE.Points(geo, mat);
+            scene.add(pts);
+            fireflies.push(pts);
+        }
+
+        function spawnSmoke() {
+            if(Math.random() > 0.1) return;
+            const geo = new THREE.SphereGeometry(Math.random()*0.8 + 0.5, 4, 4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.6 });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set(8 + (Math.random()-0.5), 34, -5 + (Math.random()-0.5));
+            scene.add(p);
+            smokeParticles.push(p);
+        }
+
+        function spawnSnow() {
+            const geo = new THREE.PlaneGeometry(0.3, 0.3);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.set((Math.random()-0.5)*200, 100, (Math.random()-0.5)*200);
+            p.rotation.set(Math.random(), Math.random(), Math.random());
+            scene.add(p);
+            snowParticles.push(p);
+        }
+
+        function spawnBirds() {
+            for(let i=0; i<5; i++) {
+                const geo = new THREE.ConeGeometry(0.5, 2, 4);
+                const mat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+                const b = new THREE.Mesh(geo, mat);
+                b.rotation.x = Math.PI / 2;
+                b.position.set(-100 - i*2, 60 + Math.random()*5, -50 + i*2);
+                scene.add(b);
+                birds.push({ mesh: b, speed: 0.2 + Math.random()*0.1 });
+            }
+        }
+
+        function launchFireworkManual() {
+            const color = new THREE.Color().setHSL(Math.random(), 1, 0.5);
+            const x = (Math.random() - 0.5) * 80;
+            const z = (Math.random() - 0.5) * 80 - 20;
+            
+            // Explosion particles
+            for(let i=0; i<30; i++) {
+                const geo = new THREE.SphereGeometry(0.5);
+                const mat = new THREE.MeshBasicMaterial({ color: color });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(x, 60, z);
+                
+                const velocity = new THREE.Vector3(
+                    (Math.random()-0.5) * 2,
+                    (Math.random()-0.5) * 2,
+                    (Math.random()-0.5) * 2
+                );
+                
+                scene.add(p);
+                fireworks.push({ mesh: p, vel: velocity, life: 1.0 });
+            }
+        }
+
+        function spawnFloatingHeart(x, z) {
+            const shape = new THREE.Shape();
+            const width = 1, height = 1;
+            shape.moveTo(0,0);
+            shape.bezierCurveTo(width/2, height/2, width, 0, width, -height/2);
+            shape.bezierCurveTo(width, -height, width/2, -height*1.5, 0, -height*2);
+            shape.bezierCurveTo(-width/2, -height*1.5, -width, -height, -width, -height/2);
+            shape.bezierCurveTo(-width, 0, -width/2, height/2, 0, 0);
+
+            const geo = new THREE.ShapeGeometry(shape);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff69b4, side: THREE.DoubleSide });
+            const heart = new THREE.Mesh(geo, mat);
+            heart.position.set(x, 1, z);
+            heart.rotation.x = Math.PI; // Flip upright
+            heart.scale.set(0.5, 0.5, 0.5);
+            scene.add(heart);
+            
+            // Reuse roseParticles logic for rising effect
+            roseParticles.push(heart); 
+        }
+
+        // --- INTERACTION & LOGIC ---
+
+        function onTouchStart(event) {
+            event.preventDefault(); // Prevent scrolling
+            // Use the first touch
+            mouse.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
+            
+            // Check interaction directly on touch start
+            checkIntersection(true);
+        }
 
         function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            checkIntersection();
+            checkIntersection(false);
         }
 
-        function checkIntersection() {
+        function onMouseClick() {
+            checkIntersection(true);
+        }
+
+        function checkIntersection(isClick) {
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
             
             let foundInteractable = false;
+
             if (intersects.length > 0) {
                 // Find first interactable parent
                 let obj = intersects[0].object;
+                let interactable = null;
+                
+                // Traverse up
                 while(obj) {
                     if (obj.userData && obj.userData.isInteractable) {
-                        foundInteractable = true;
-                        document.body.style.cursor = 'pointer';
-                        
-                        // Simple highlight logic
-                        if (obj.material && obj.material.emissive) {
-                            obj.material.emissive.setHex(0x333333);
-                        }
+                        interactable = obj;
                         break;
                     }
                     obj = obj.parent;
+                }
+
+                if (interactable) {
+                    foundInteractable = true;
+                    document.body.style.cursor = 'pointer';
+                    
+                    if (isClick) {
+                        handleInteraction(interactable.userData.type, interactable, intersects[0].point);
+                    } else if (interactable.material && interactable.material.emissive) {
+                        // Hover glow
+                        interactable.material.emissive.setHex(0x333333);
+                    }
+                } else if (isClick && intersects[0].object === grassMesh) {
+                    // Click on ground spawns heart
+                    spawnFloatingHeart(intersects[0].point.x, intersects[0].point.z);
                 }
             }
 
             if (!foundInteractable) {
                 document.body.style.cursor = 'grab';
-                // Reset highlights (simplified)
                 scene.traverse(child => {
                     if (child.material && child.material.emissive) child.material.emissive.setHex(0x000000);
                 });
             }
         }
 
-        function onMouseClick() {
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children, true);
-
-            if (intersects.length > 0) {
-                let obj = intersects[0].object;
-                // Traverse up to find user data
-                while(obj) {
-                    if (obj.userData && obj.userData.isInteractable) {
-                        handleInteraction(obj.userData.type, obj);
-                        return;
-                    }
-                    obj = obj.parent;
-                }
-            }
+        function handleInteraction(type, object, point) {
+            if (type === 'door') openDoorAndPlay();
+            else if (type === 'mailbox') showLoveLetter();
+            else if (type === 'lantern') toggleLantern(object);
+            else if (type === 'window') toggleWindowLight(object);
         }
 
-        function handleInteraction(type, object) {
-            if (type === 'door') {
-                openDoorAndPlay();
-            } else if (type === 'mailbox') {
-                showLoveLetter();
-            } else if (type === 'lantern') {
-                // Change color just for fun
-                object.parent.children.forEach(c => {
-                    if(c.isPointLight) c.color.setHex(Math.random() * 0xffffff);
-                });
-            }
-        }
+        // --- ACTIONS ---
 
         function openDoorAndPlay() {
             if(isPlaying) return;
             
-            // Animation: Open Door
+            // Door Animation
             const targetRot = -Math.PI / 1.5;
             let alpha = 0;
-            const interval = setInterval(() => {
+            const i = setInterval(() => {
                 alpha += 0.05;
                 doorGroup.rotation.y = THREE.MathUtils.lerp(0, targetRot, alpha);
-                if(alpha >= 1) clearInterval(interval);
+                if(alpha >= 1) clearInterval(i);
             }, 16);
 
-            // Zoom Camera
+            // Camera Zoom
             const startPos = camera.position.clone();
-            const endPos = new THREE.Vector3(0, 15, 40);
-            let camAlpha = 0;
-            const camInterval = setInterval(() => {
-                camAlpha += 0.02;
-                camera.position.lerpVectors(startPos, endPos, camAlpha);
-                if (camAlpha >= 1) clearInterval(camInterval);
+            const endPos = new THREE.Vector3(0, 15, 35);
+            let cA = 0;
+            const cI = setInterval(() => {
+                cA += 0.02;
+                camera.position.lerpVectors(startPos, endPos, cA);
+                if(cA >= 1) clearInterval(cI);
             }, 16);
 
-            document.getElementById('content-card').classList.add('visible');
-            document.getElementById('card-title').innerText = "For My Sunshine";
+            showCard("For My Sunshine");
             document.getElementById('interaction-hint').style.opacity = 0;
-            
             startSong();
         }
 
         function showLoveLetter() {
-            if(isPlaying) return; // Focus on one thing
-            
-            document.getElementById('content-card').classList.add('visible');
-            document.getElementById('card-title').innerText = "A Note for You";
-            
+            showCard("A Note for You");
             const letter = `
                 "My Dearest ${CONFIG.names.recipient},<br><br>
                 Every brick of this house represents a moment we've shared.<br>
-                Every light represents the brightness you bring to my life.<br>
                 This digital world is small, but my love for you is infinite.<br><br>
                 Yours always,<br>${CONFIG.names.sender}"
             `;
             document.getElementById('card-body').innerHTML = letter;
-            document.getElementById('card-body').style.fontSize = "1rem";
         }
 
-        function closeCard() {
-            document.getElementById('content-card').classList.remove('visible');
-            stopExperience();
-            
-            // Close door animation
-            doorGroup.rotation.y = 0; 
-            
-            // Reset Camera smoothly
-            const endPos = new THREE.Vector3(0, 20, 90);
-            let alpha = 0;
-            const interval = setInterval(() => {
-                alpha += 0.05;
-                camera.position.lerp(endPos, 0.1);
-                if(camera.position.distanceTo(endPos) < 1) clearInterval(interval);
-            }, 20);
-
-            document.getElementById('interaction-hint').style.opacity = 1;
+        function toggleLantern(mesh) {
+            mesh.parent.children.forEach(c => {
+                if(c.isPointLight) c.intensity = c.intensity > 0 ? 0 : 1;
+            });
         }
 
-        // --- FEATURES ---
+        function toggleWindowLight(mesh) {
+            mesh.material.opacity = mesh.material.opacity > 0.5 ? 0.2 : 0.9;
+            mesh.material.color.setHex(mesh.material.opacity > 0.5 ? 0xffffaa : 0x000000);
+        }
+
+        // --- FEATURES & TOGGLES ---
+
+        function toggleMenu() {
+            const menu = document.getElementById('features-menu');
+            menu.classList.toggle('open');
+        }
 
         function toggleDayNight() {
             isNight = !isNight;
@@ -710,69 +880,147 @@
                 mainLight.intensity = isNight ? 0.5 : 1.2;
                 mainLight.color.setHex(isNight ? 0xaaccff : 0xffffee);
             }
+            // Fireflies only at night
+            fireflies.forEach(f => f.visible = isNight);
             
-            // Toggle Lanterns
-            lanterns.forEach(l => l.intensity = isNight ? 0.8 : 0);
-            // Toggle Fireflies
-            fireflies[0].visible = isNight;
+            // Button icon update
+            document.getElementById('btn-daynight').innerText = isNight ? '☾' : '☀';
         }
 
-        function toggleRain() {
-            isRainingRoses = !isRainingRoses;
-            if(!isRainingRoses) {
-                roseParticles.forEach(p => scene.remove(p));
-                roseParticles = [];
+        function toggleRain() { isRainingRoses = !isRainingRoses; }
+        function toggleSnow() { 
+            isSnowing = !isSnowing;
+            isWinter = !isWinter;
+            // Update materials for winter look
+            grassMesh.material.color.setHex(isWinter ? 0xffffff : CONFIG.colors.grass);
+            scene.traverse(o => {
+                if(o.type === 'Group') { // Trees
+                   o.children.forEach(c => {
+                       if(c.geometry && c.geometry.type === 'ConeGeometry') {
+                           c.material.color.setHex(isWinter ? 0xeeeeee : 0x2d5a27);
+                       }
+                   });
+                }
+            });
+        }
+        function toggleClouds() { 
+            isCloudy = !isCloudy;
+            if(isCloudy && clouds.length === 0) {
+                // Create Clouds
+                for(let i=0; i<5; i++) {
+                    const c = new THREE.Mesh(new THREE.SphereGeometry(8, 8, 8), new THREE.MeshBasicMaterial({color: 0xffffff, transparent:true, opacity:0.8}));
+                    c.position.set((Math.random()-0.5)*200, 80 + Math.random()*20, -50 + Math.random()*50);
+                    c.scale.x = 2;
+                    scene.add(c);
+                    clouds.push(c);
+                }
             }
+            clouds.forEach(c => c.visible = isCloudy);
         }
-
-        function createRosePetal() {
-            const geo = new THREE.PlaneGeometry(0.5, 0.5);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xff007f, side: THREE.DoubleSide });
-            const petal = new THREE.Mesh(geo, mat);
-            
-            petal.position.set(
-                (Math.random() - 0.5) * 100,
-                100,
-                (Math.random() - 0.5) * 100
-            );
-            petal.rotation.set(Math.random(), Math.random(), Math.random());
-            
-            scene.add(petal);
-            roseParticles.push(petal);
+        function toggleAutoRotate() { 
+            isAutoRotate = !isAutoRotate;
+            controls.autoRotate = isAutoRotate; 
+        }
+        function toggleFog() {
+            scene.fog.density = scene.fog.density > 0.01 ? 0.005 : 0.04;
+        }
+        function changeLightColor() {
+            lanterns.forEach(l => l.color.setHex(Math.random() * 0xffffff));
+            const porch = scene.getObjectByName("PorchLight");
+            if(porch) porch.color.setHex(Math.random() * 0xffffff);
+        }
+        function toggleRainbow() {
+            if(!rainbowMesh) createRainbow();
+            isRainbow = !isRainbow;
+            rainbowMesh.material.opacity = isRainbow ? 0.5 : 0.0;
         }
 
         // --- ANIMATION LOOP ---
 
         function animate() {
             requestAnimationFrame(animate);
+            const delta = clock.getDelta();
             controls.update();
 
-            // Fireflies movement
-            if(fireflies.length > 0 && isNight) {
-                const positions = fireflies[0].geometry.attributes.position.array;
-                for(let i=0; i<positions.length; i+=3) {
-                    positions[i+1] += Math.sin(Date.now() * 0.001 + positions[i]) * 0.05;
-                    positions[i] += Math.cos(Date.now() * 0.001 + positions[i+1]) * 0.02;
+            // Fireflies
+            if(isNight && fireflies.length > 0) {
+                const pos = fireflies[0].geometry.attributes.position.array;
+                for(let i=0; i<pos.length; i+=3) {
+                    pos[i+1] += Math.sin(Date.now()*0.001 + pos[i])*0.05;
                 }
                 fireflies[0].geometry.attributes.position.needsUpdate = true;
             }
 
-            // Rose Rain
+            // Smoke
+            spawnSmoke();
+            for(let i=smokeParticles.length-1; i>=0; i--) {
+                const p = smokeParticles[i];
+                p.position.y += 0.1;
+                p.material.opacity -= 0.01;
+                if(p.material.opacity <= 0) { scene.remove(p); smokeParticles.splice(i,1); }
+            }
+
+            // Rain/Hearts rising
             if(isRainingRoses) {
-                if(Math.random() > 0.8) createRosePetal(); // Spawn rate
-                
-                for(let i = roseParticles.length - 1; i >= 0; i--) {
-                    const p = roseParticles[i];
-                    p.position.y -= 0.2;
-                    p.rotation.x += 0.02;
-                    p.rotation.y += 0.02;
-                    
-                    if(p.position.y < 0) {
-                        scene.remove(p);
-                        roseParticles.splice(i, 1);
-                    }
+               if(Math.random()>0.8) {
+                    const geo = new THREE.PlaneGeometry(0.5, 0.5);
+                    const mat = new THREE.MeshBasicMaterial({color: 0xff007f, side:THREE.DoubleSide});
+                    const p = new THREE.Mesh(geo, mat);
+                    p.position.set((Math.random()-0.5)*100, 100, (Math.random()-0.5)*100);
+                    scene.add(p);
+                    roseParticles.push(p);
+               }
+            }
+
+            // Handle particles (Rose/Hearts/Snow)
+            for(let i=roseParticles.length-1; i>=0; i--) {
+                const p = roseParticles[i];
+                if(p.geometry.type === 'ShapeGeometry') { // Rising Hearts
+                    p.position.y += 0.1;
+                    p.material.opacity -= 0.005;
+                    if(p.position.y > 20) { scene.remove(p); roseParticles.splice(i,1); }
+                } else { // Falling Roses
+                    p.position.y -= 0.2; p.rotation.x += 0.05;
+                    if(p.position.y < 0) { scene.remove(p); roseParticles.splice(i,1); }
                 }
             }
+
+            if(isSnowing) {
+                if(Math.random()>0.5) spawnSnow();
+                for(let i=snowParticles.length-1; i>=0; i--) {
+                    const p = snowParticles[i];
+                    p.position.y -= 0.1; p.position.x += Math.sin(Date.now()*0.001)*0.02;
+                    if(p.position.y < 0) { scene.remove(p); snowParticles.splice(i,1); }
+                }
+            }
+
+            // Birds
+            birds.forEach(b => {
+                b.mesh.position.x += b.speed;
+                b.mesh.position.y += Math.sin(Date.now()*0.002)*0.05;
+                if(b.mesh.position.x > 100) b.mesh.position.x = -100;
+            });
+
+            // Clouds
+            clouds.forEach(c => {
+                c.position.x += 0.02;
+                if(c.position.x > 150) c.position.x = -150;
+            });
+
+            // Fireworks
+            for(let i=fireworks.length-1; i>=0; i--) {
+                const fw = fireworks[i];
+                fw.mesh.position.add(fw.vel);
+                fw.vel.y -= 0.02; // Gravity
+                fw.life -= 0.02;
+                fw.mesh.material.opacity = fw.life;
+                if(fw.life <= 0) { scene.remove(fw.mesh); fireworks.splice(i,1); }
+            }
+
+            // Flowers sway
+            flowers.forEach((f, idx) => {
+                f.rotation.z = Math.sin(Date.now()*0.002 + idx)*0.1;
+            });
 
             renderer.render(scene, camera);
         }
@@ -783,7 +1031,34 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // --- AUDIO/LYRICS ---
+        // --- UI HELPERS ---
+
+        function showCard(title) {
+            const card = document.getElementById('content-card');
+            card.classList.add('visible');
+            document.getElementById('card-title').innerText = title;
+        }
+
+        function closeCard() {
+            document.getElementById('content-card').classList.remove('visible');
+            stopExperience();
+            
+            // Close door
+            doorGroup.rotation.y = 0; 
+            
+            // Reset Camera
+            const endPos = new THREE.Vector3(0, 20, 90);
+            let a = 0;
+            const i = setInterval(() => {
+                a += 0.05;
+                camera.position.lerp(endPos, 0.1);
+                if(camera.position.distanceTo(endPos) < 1) clearInterval(i);
+            }, 20);
+
+            document.getElementById('interaction-hint').style.opacity = 1;
+        }
+
+        // --- AUDIO ---
 
         function startSong() {
             isPlaying = true;
@@ -809,11 +1084,7 @@
             }, 300);
 
             const u = new SpeechSynthesisUtterance(text);
-            u.pitch = 1; 
-            u.rate = 0.9;
-            u.volume = 1;
-            
-            // Try to pick a nice voice
+            u.pitch = 1; u.rate = 0.9; u.volume = 1;
             const voices = synth.getVoices();
             const v = voices.find(v => v.name.includes("Google US English") || v.name.includes("Samantha"));
             if(v) u.voice = v;
