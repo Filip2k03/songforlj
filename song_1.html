@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Romantic AI Song with TTS and 3D Heart</title>
+    <style>
+        /* Basic styling for the page */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+            flex-direction: column;
+        }
+
+        h1 {
+            font-size: 3em;
+            color: #ff69b4; /* Romantic pink color */
+            margin-bottom: 20px;
+        }
+
+        p {
+            font-size: 1.5em;
+            color: #ffffff;
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: #ff69b4;
+            border: none;
+            padding: 15px;
+            color: white;
+            font-size: 1.2em;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover {
+            background-color: #ff1493; /* Darker pink */
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* Animation for text fade-in */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #lyrics-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        #music-player {
+            margin-top: 20px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1; /* Ensure 3D model is behind text */
+        }
+    </style>
+</head>
+<body>
+
+<div id="lyrics-container">
+    <h1>You're My Sunshine</h1>
+    <p id="verse1">You’re the light that shines in the night, LJ</p>
+    <p id="preChorus">Every time I see you, feels like a holiday,</p>
+    <p id="chorus">Got that smile that lights up the whole street,</p>
+    <button onclick="playSpeech()">Play Song with AI Voice</button>
+</div>
+
+<audio id="music-player" controls autoplay>
+    <source src="your-romantic-sound.mp3" type="audio/mp3">
+    Your browser does not support the audio element.
+</audio>
+
+<!-- Three.js for 3D Heart Model -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.min.js"></script>
+
+<script>
+    // Three.js setup for 3D model (Heart)
+    let scene, camera, renderer, heart;
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Load Heart Model
+        const loader = new THREE.GLTFLoader();
+        loader.load('path_to_your_heart_model.glb', function (gltf) {
+            heart = gltf.scene;
+            heart.scale.set(1, 1, 1); // Scale the heart to fit your scene
+            scene.add(heart);
+        });
+
+        camera.position.z = 5;
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        // Rotate the heart model
+        if (heart) {
+            heart.rotation.x += 0.01;
+            heart.rotation.y += 0.01;
+        }
+
+        renderer.render(scene, camera);
+    }
+
+    init();
+
+    // Text-to-Speech AI Voice to "sing" the lyrics
+    function playSpeech() {
+        const msg = new SpeechSynthesisUtterance();
+
+        msg.text = `
+        You’re the light that shines in the night, LJ. 
+        Every time I see you, feels like a holiday.
+        Got that smile that lights up the whole street.
+        Heart racing near you, baby, it’s on repeat.
+        
+        Calling your name like a song on replay.
+        Everything you do just feels like fate today.
+        Your laugh lifts me, it takes me so high.
+        There’s no one like you, girl, you make me fly.
+        
+        With you, I’m high, I’m in the clouds.
+        Dreaming ‘bout us, no doubts allowed.
+        In your eyes, I see the stars in line.
+        You’re my peace, my queen, my sunshine.
+        `;
+
+        // Adjust pitch, rate, and volume for a smoother voice
+        msg.pitch = 1.5;  // Higher pitch for more melodic effect
+        msg.rate = 0.9;   // Slow down the speech for a smoother delivery
+        msg.volume = 1;   // Full volume
+
+        window.speechSynthesis.speak(msg);
+    }
+</script>
+
+</body>
+</html>
