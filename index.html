@@ -324,6 +324,13 @@
         // Systems
         let roseParticles = [], fireflies = [], snowParticles = [], smokeParticles = [], clouds = [], birds = [], fireworks = [];
         let lanterns = [], flowers = [];
+
+        // New globals
+        let signMesh = null;
+        let autoFireworksInterval = null;
+        let lightBulb = null;
+        let starsGroup = null;
+        let pathLights = [];
         
         // State
         let isNight = true;
@@ -381,6 +388,9 @@
             createChimney();
             createFireflies();
             createFlowers();
+            createLightBulb();
+            spawnStars();
+            addWindowFrames();
 
             // Interaction
             raycaster = new THREE.Raycaster();
@@ -489,20 +499,23 @@
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 128;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = "rgba(0,0,0,0)";
-            ctx.fillRect(0,0,512,128);
-            ctx.font = 'bold 50px "Playfair Display"';
-            ctx.fillStyle = "#3e2723";
-            ctx.textAlign = "center"; ctx.textBaseline = "middle";
-            ctx.fillText(CONFIG.names.recipient, 256, 64);
+            function drawSignText(text, color = '#3e2723') {
+                ctx.clearRect(0,0,512,128);
+                ctx.fillStyle = "rgba(0,0,0,0)"; ctx.fillRect(0,0,512,128);
+                ctx.font = 'bold 46px "Playfair Display"';
+                ctx.fillStyle = color;
+                ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText(text, 256, 64);
+            }
+            drawSignText(CONFIG.names.recipient + ' LJ');
             const signTex = new THREE.CanvasTexture(canvas);
-            
-            const sign = new THREE.Mesh(
+            signMesh = new THREE.Mesh(
                 new THREE.BoxGeometry(18, 4, 1),
                 new THREE.MeshStandardMaterial({ map: signTex, color: 0xffffff, emissive: 0x000000, emissiveIntensity: 0 })
             );
-            sign.position.set(0, 22, 13);
-            houseGroup.add(sign);
+            signMesh.position.set(0, 22, 13);
+            signMesh.userData = { canvas, ctx, drawSignText };
+            houseGroup.add(signMesh);
 
             // Door Group
             doorGroup = new THREE.Group();
@@ -654,6 +667,175 @@
             rainbowMesh.position.set(0, -10, -50);
             scene.add(rainbowMesh);
         }
+
+        // --- Additional Features (many small helpers) ---
+
+        function setSignText(text, color) {
+            if(!signMesh || !signMesh.userData) return;
+            signMesh.userData.drawSignText(text, color || '#3e2723');
+            signMesh.material.map.needsUpdate = true;
+        }
+
+        function toggleSignGlow(enable) {
+            if(!signMesh) return;
+            if(enable === undefined) enable = isNight;
+            if(enable) {
+                signMesh.material.emissive.setHex(0xff88cc);
+                signMesh.material.emissiveIntensity = 1.2;
+            } else {
+                signMesh.material.emissive.setHex(0x000000);
+                signMesh.material.emissiveIntensity = 0;
+            }
+        }
+
+        function createLightBulb() {
+            const bulb = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 12), new THREE.MeshStandardMaterial({ color: 0xffffee, emissive: 0x000000 }));
+            bulb.position.set(0, 26, 16);
+            const light = new THREE.PointLight(0xffeeaa, 0, 20);
+            light.position.copy(bulb.position);
+            light.name = 'BulbLight';
+            scene.add(bulb);
+            scene.add(light);
+            lightBulb = { mesh: bulb, light };
+        }
+
+        function toggleLightBulb() {
+            if(!lightBulb) return;
+            const on = lightBulb.light.intensity === 0;
+            lightBulb.light.intensity = on ? 1.2 : 0;
+            lightBulb.mesh.material.emissive.setHex(on ? 0xfff0cc : 0x000000);
+        }
+
+        function createRealisticFirework(x=0, y=60, z=0, color) {
+            const parts = [];
+            for(let i=0;i<80;i++){
+                const geo = new THREE.SphereGeometry(0.25,6,6);
+                const mat = new THREE.MeshBasicMaterial({ color: color || new THREE.Color(Math.random(), Math.random(), Math.random()) });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(x, y, z);
+                p.userData = { vel: new THREE.Vector3((Math.random()-0.5)*6, Math.random()*6, (Math.random()-0.5)*6), life: 1.0 };
+                scene.add(p); parts.push(p);
+            }
+            fireworks.push(...parts.map(m => ({ mesh: m, vel: m.userData.vel, life: m.userData.life })));
+        }
+
+        function createRainbowFirework(x,y,z) {
+            const hues = [0, 30, 60, 120, 180, 240, 300];
+            for(let h of hues){
+                const color = new THREE.Color(`hsl(${h},100%,60%)`);
+                createRealisticFirework(x, y + (Math.random()*10-5), z, color);
+            }
+        }
+
+        function playFireworkSequence(count=6) {
+            for(let i=0;i<count;i++){
+                setTimeout(()=>{
+                    const x = (Math.random()-0.5)*120;
+                    const z = (Math.random()-0.5)*120 - 20;
+                    if(Math.random()>0.5) createRainbowFirework(x, 60 + Math.random()*20, z);
+                    else createRealisticFirework(x, 60 + Math.random()*20, z);
+                }, i*700);
+            }
+        }
+
+        function startAutoFireworks(intervalMs=5000) {
+            if(autoFireworksInterval) return;
+            autoFireworksInterval = setInterval(()=> playFireworkSequence(3), intervalMs);
+        }
+
+        function stopAutoFireworks() {
+            if(!autoFireworksInterval) return;
+            clearInterval(autoFireworksInterval); autoFireworksInterval = null;
+        }
+
+        function addPorchDetail() {
+            const porch = new THREE.Mesh(new THREE.BoxGeometry(12,1,8), new THREE.MeshStandardMaterial({ color: 0x8b5a2b }));
+            porch.position.set(0,0.5,18); porch.receiveShadow = true; scene.add(porch);
+        }
+
+        function addWindowFrames() {
+            // Add small frames around windows to increase realism
+            const frames = [];
+            const positions = [[-8,15,12.6],[8,15,12.6]];
+            positions.forEach(p=>{
+                const f = new THREE.Mesh(new THREE.BoxGeometry(6.2,6.2,0.2), new THREE.MeshStandardMaterial({color:0x332211}));
+                f.position.set(p[0],p[1],p[2]+0.3); scene.add(f); frames.push(f);
+            });
+        }
+
+        function addRoofTiles() {
+            // Simple tile pattern across roof
+            for(let i=-10;i<=10;i+=2){
+                for(let j=-6;j<=6;j+=1.5){
+                    const t = new THREE.Mesh(new THREE.BoxGeometry(2,0.2,1.2), new THREE.MeshStandardMaterial({color:0x9b3f5b}));
+                    t.position.set(i, 37 + Math.random()*0.4, j); t.rotation.y = Math.random()*0.1; scene.add(t);
+                }
+            }
+        }
+
+        function addInteriorLights() {
+            scene.traverse(o=>{
+                if(o.userData && o.userData.type === 'window'){
+                    const li = new THREE.PointLight(0xfff3cc, 0.0, 20);
+                    li.position.set(o.position.x, o.position.y, o.position.z+2);
+                    scene.add(li);
+                    o.userData.interiorLight = li;
+                }
+            });
+        }
+
+        function toggleInteriorLights() {
+            scene.traverse(o=>{
+                if(o.userData && o.userData.interiorLight){
+                    const L = o.userData.interiorLight; L.intensity = L.intensity > 0 ? 0 : 0.9;
+                }
+            });
+        }
+
+        function spawnStars() {
+            if(starsGroup) return;
+            starsGroup = new THREE.Group();
+            const geo = new THREE.BufferGeometry();
+            const pts = [];
+            for(let i=0;i<300;i++) pts.push((Math.random()-0.5)*400, 80+Math.random()*60, (Math.random()-0.5)*400);
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+            const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.7, transparent:true, opacity:0.9 });
+            const p = new THREE.Points(geo, mat); starsGroup.add(p); scene.add(starsGroup);
+            starsGroup.visible = isNight;
+        }
+
+        function toggleStars() { if(starsGroup) starsGroup.visible = !starsGroup.visible; }
+
+        function spawnConfetti(x=0,y=50,z=0) {
+            for(let i=0;i<80;i++){
+                const geo = new THREE.PlaneGeometry(0.5,0.7);
+                const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(Math.random(),Math.random(),Math.random()), side:THREE.DoubleSide });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(x + (Math.random()-0.5)*20, y + Math.random()*20, z + (Math.random()-0.5)*20);
+                p.rotation.set(Math.random(),Math.random(),Math.random()); scene.add(p);
+                fireworks.push({ mesh: p, vel: new THREE.Vector3((Math.random()-0.5)*0.6, -0.2 - Math.random()*0.6, (Math.random()-0.5)*0.6), life: 2.0 });
+            }
+        }
+
+        function togglePathLights() {
+            if(pathLights.length === 0) {
+                scene.traverse(o => { if(o.geometry && o.geometry.type === 'SphereGeometry' && o.position.z > 0) pathLights.push(o); });
+            }
+            pathLights.forEach(p=> p.visible = !p.visible);
+        }
+
+        function toggleHouseDetail() { addPorchDetail(); addRoofTiles(); }
+
+        function toggleShadows() { renderer.shadowMap.enabled = !renderer.shadowMap.enabled; }
+
+        function cycleSkyColors() {
+            const c1 = new THREE.Color(Math.random()*0xffffff);
+            const c2 = new THREE.Color(Math.random()*0xffffff);
+            scene.background = c1; scene.fog.color = c2;
+        }
+
+        function randomizeLanternColors() { lanterns.forEach(l => l.color.setHex(Math.random()*0xffffff)); }
+
 
         // --- PARTICLE SYSTEMS ---
 
