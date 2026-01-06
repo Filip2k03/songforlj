@@ -331,6 +331,13 @@
         let lightBulb = null;
         let starsGroup = null;
         let pathLights = [];
+        let moonMesh = null;
+        let moonLight = null;
+        let moonPhase = 0;
+        let photoModeActive = false;
+        let danceGroup = null;
+        let windStrength = 0.02;
+        let signPulseInterval = null;
         
         // State
         let isNight = true;
@@ -836,6 +843,153 @@
 
         function randomizeLanternColors() { lanterns.forEach(l => l.color.setHex(Math.random()*0xffffff)); }
 
+                // --- Extra Romantic Features (new) ---
+
+                // Heart-shaped firework: explode particles arranged along a heart curve
+                function shootHeartFirework(x=0,y=60,z=0, color) {
+                    const points = [];
+                    for(let t = 0; t < Math.PI * 2; t += 0.2) {
+                        const r = 10 * (1 - Math.sin(t));
+                        const px = 16 * Math.pow(Math.sin(t),3);
+                        const py = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                        points.push(new THREE.Vector3(px*0.6, py*0.6, (Math.random()-0.5)*2));
+                    }
+                    points.forEach(p => {
+                        const geo = new THREE.SphereGeometry(0.18,6,6);
+                        const mat = new THREE.MeshBasicMaterial({ color: color || new THREE.Color(Math.random(),Math.random(),Math.random()) });
+                        const m = new THREE.Mesh(geo, mat);
+                        m.position.set(x + p.x, y + p.y, z + p.z);
+                        m.userData = { vel: new THREE.Vector3((Math.random()-0.5)*0.6, -0.02 - Math.random()*0.2, (Math.random()-0.5)*0.6), life: 2.0 };
+                        scene.add(m);
+                        fireworks.push({ mesh: m, vel: m.userData.vel, life: m.userData.life });
+                    });
+                }
+
+                // Pulse the sign colors slowly (useful for celebrations)
+                function signPulseColors(speed = 1000) {
+                    if(signPulseInterval) { clearInterval(signPulseInterval); signPulseInterval = null; }
+                    signPulseInterval = setInterval(()=>{
+                        if(!signMesh) return;
+                        const h = Math.floor(Math.random()*360);
+                        const col = new THREE.Color(`hsl(${h},85%,65%)`);
+                        signMesh.material.emissive.set(col);
+                        signMesh.material.emissiveIntensity = 1.2;
+                        setTimeout(()=>{ if(signMesh) signMesh.material.emissiveIntensity = 0.9; }, speed/2);
+                    }, speed);
+                }
+
+                // Photo mode: hide UI and open a snapshot in a new tab
+                function photoMode() {
+                    try {
+                        const ui = document.getElementById('ui-layer');
+                        ui.style.display = ui.style.display === 'none' ? 'flex' : 'none';
+                        // Render one frame then snapshot
+                        renderer.render(scene, camera);
+                        if(ui.style.display === 'none') {
+                            const data = renderer.domElement.toDataURL('image/png');
+                            const w = window.open('about:blank');
+                            if(w) w.document.write(`<img src="${data}" alt="snapshot">`);
+                        }
+                    } catch(e) { console.warn('Photo mode unavailable:', e); }
+                }
+
+                // Moon phase toggle: cycles through phases and updates moon light
+                function toggleMoonPhase() {
+                    moonPhase = (moonPhase + 1) % 4; // 0: full,1: gibbous,2: half,3:crescent
+                    if(!moonMesh) {
+                        moonMesh = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 16), new THREE.MeshBasicMaterial({ color: 0xffffee }));
+                        moonMesh.position.set(-80, 120, -100); scene.add(moonMesh);
+                        moonLight = new THREE.DirectionalLight(0xffffff, 0.4); moonLight.position.set(-80,120,-100); scene.add(moonLight);
+                    }
+                    const intensities = [0.6, 0.45, 0.3, 0.15];
+                    moonLight.intensity = intensities[moonPhase];
+                    moonMesh.material.opacity = 0.8; moonMesh.material.transparent = true;
+                    moonMesh.material.color.setHex([0xffffee,0xfff4d6,0xfff8e0,0xfff0c8][moonPhase]);
+                }
+
+                // Sparkle path: tiny particles that trace the path to the house
+                function sparklePath(amount = 12) {
+                    for(let i=0;i<amount;i++){
+                        const g = new THREE.SphereGeometry(0.08);
+                        const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0xffe4f0, transparent:true, opacity:0.9 }));
+                        const z = 20 + Math.random()*40; const x = (Math.random()>0.5?7:-7);
+                        m.position.set(x, 0.6, z);
+                        m.userData = { life: 2.0, vel: new THREE.Vector3(0, Math.random()*0.2 + 0.1, 0) };
+                        scene.add(m); fireworks.push({ mesh: m, vel: m.userData.vel, life: m.userData.life });
+                    }
+                }
+
+                // Soft wind: adjusts flower sway and optionally tree tilt
+                function softWind(strength = 0.02) { windStrength = strength; }
+
+                // Light bulb blink with optional morse-like pattern
+                function lightBulbBlink(rate = 300) {
+                    if(!lightBulb) return;
+                    let on = false;
+                    const id = setInterval(()=>{ on = !on; lightBulb.light.intensity = on ? 1.2 : 0; lightBulb.mesh.material.emissive.setHex(on?0xfff2cc:0x000000); }, rate);
+                    setTimeout(()=> clearInterval(id), 8000);
+                }
+
+                // Lamp romance mode: warm lanterns + subtle dust motes
+                function lampRomanceMode(enable = true) {
+                    lanterns.forEach(l => l.intensity = enable ? 1.2 : 0.0);
+                    if(enable) {
+                        for(let i=0;i<20;i++){
+                            const geo = new THREE.SphereGeometry(0.06);
+                            const mat = new THREE.MeshBasicMaterial({ color: 0xffe4b5, transparent:true, opacity:0.6 });
+                            const p = new THREE.Mesh(geo, mat);
+                            p.position.set((Math.random()-0.5)*30, 10 + Math.random()*10, (Math.random()-0.5)*30);
+                            p.userData = { vel: new THREE.Vector3(0, 0.01 + Math.random()*0.02, 0), life: 6.0 };
+                            scene.add(p); fireworks.push({ mesh: p, vel: p.userData.vel, life: p.userData.life });
+                        }
+                    }
+                }
+
+                // Couple dance: spawn two simple meshes and animate them in place
+                function coupleDance() {
+                    if(danceGroup) { scene.remove(danceGroup); danceGroup = null; return; }
+                    danceGroup = new THREE.Group();
+                    const a = new THREE.Mesh(new THREE.BoxGeometry(1.2,2,0.6), new THREE.MeshStandardMaterial({ color: 0xffc0cb }));
+                    const b = new THREE.Mesh(new THREE.BoxGeometry(1.2,2,0.6), new THREE.MeshStandardMaterial({ color: 0x88ccff }));
+                    a.position.set(-3,1,25); b.position.set(3,1,25);
+                    danceGroup.add(a); danceGroup.add(b); scene.add(danceGroup);
+                    let t = 0;
+                    const id = setInterval(()=>{
+                        t += 0.05;
+                        a.position.x = -3 + Math.sin(t)*0.6; a.rotation.y = Math.sin(t)*0.2;
+                        b.position.x = 3 + Math.sin(t+Math.PI)*0.6; b.rotation.y = Math.sin(t+Math.PI)*0.2;
+                    }, 30);
+                    // stop after 18s
+                    setTimeout(()=>{ clearInterval(id); if(danceGroup){ scene.remove(danceGroup); danceGroup = null; } }, 18000);
+                }
+
+                // Ambient color fade between two random tints
+                function ambientColorFade(duration = 4000) {
+                    const start = new THREE.Color(scene.background.getHex());
+                    const end = new THREE.Color(Math.random()*0xffffff);
+                    const t0 = Date.now();
+                    const tick = ()=>{
+                        const a = (Date.now() - t0)/duration;
+                        if(a >= 1) { scene.background = end; return; }
+                        scene.background = start.clone().lerp(end, a);
+                        requestAnimationFrame(tick);
+                    };
+                    tick();
+                }
+
+                // Save toggles to localStorage
+                function saveSceneState() {
+                    const s = { isNight, isRainingRoses, isSnowing, isCloudy, isAutoRotate };
+                    localStorage.setItem('songforlj_state', JSON.stringify(s));
+                }
+
+                function loadSceneState() {
+                    try {
+                        const s = JSON.parse(localStorage.getItem('songforlj_state'));
+                        if(s) { isNight = s.isNight; isRainingRoses = s.isRainingRoses; isSnowing = s.isSnowing; isCloudy = s.isCloudy; isAutoRotate = s.isAutoRotate; applyDayNightState(); }
+                    } catch(e){}
+                }
+
 
         // --- PARTICLE SYSTEMS ---
 
@@ -1235,8 +1389,15 @@
 
             // Flowers sway
             flowers.forEach((f, idx) => {
-                f.rotation.z = Math.sin(Date.now()*0.002 + idx)*0.1;
+                f.rotation.z = Math.sin(Date.now()*0.002 + idx)*0.1 * (1 + windStrength*10);
             });
+
+            // Dancers update (if present) - gently bob
+            if(danceGroup) {
+                danceGroup.children.forEach((c, i) => {
+                    c.position.y = 1 + Math.sin(Date.now()*0.002 + i)*0.12;
+                });
+            }
 
             renderer.render(scene, camera);
         }
