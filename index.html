@@ -400,6 +400,12 @@
             loader.style.opacity = 0;
             setTimeout(() => loader.remove(), 1000);
 
+            // Determine local time and set initial day/night state
+            const hour = new Date().getHours();
+            // Night if before 7am or after 6pm
+            isNight = (hour < 7 || hour >= 18);
+            applyDayNightState();
+
             animate();
         }
 
@@ -493,7 +499,7 @@
             
             const sign = new THREE.Mesh(
                 new THREE.BoxGeometry(18, 4, 1),
-                new THREE.MeshStandardMaterial({ map: signTex, color: 0xffffff })
+                new THREE.MeshStandardMaterial({ map: signTex, color: 0xffffff, emissive: 0x000000, emissiveIntensity: 0 })
             );
             sign.position.set(0, 22, 13);
             houseGroup.add(sign);
@@ -869,22 +875,50 @@
             menu.classList.toggle('open');
         }
 
-        function toggleDayNight() {
-            isNight = !isNight;
+        // Apply visual changes according to the current `isNight` value
+        function applyDayNightState() {
             const bg = isNight ? CONFIG.colors.nightBg : CONFIG.colors.dayBg;
             scene.background.setHex(bg);
             scene.fog.color.setHex(bg);
-            
+
             const mainLight = scene.getObjectByName("MainLight");
             if(mainLight) {
                 mainLight.intensity = isNight ? 0.5 : 1.2;
                 mainLight.color.setHex(isNight ? 0xaaccff : 0xffffee);
             }
+
+            // Porch light / Path lights and lanterns
+            const porch = scene.getObjectByName("PorchLight");
+            if(porch) porch.intensity = isNight ? 1.0 : 0.8;
+
+            lanterns.forEach(l => l.intensity = isNight ? 0.8 : 0.0);
+
             // Fireflies only at night
             fireflies.forEach(f => f.visible = isNight);
-            
-            // Button icon update
-            document.getElementById('btn-daynight').innerText = isNight ? '☾' : '☀';
+
+            // Sign glow: find sign mesh (we created it in createHeartHouse)
+            scene.traverse(o => {
+                if(o.isMesh && o.geometry && o.geometry.parameters && o.geometry.parameters.width === 18) {
+                    if(o.material && o.material.emissive !== undefined) {
+                        if(isNight) {
+                            o.material.emissive.setHex(0xffbb88);
+                            o.material.emissiveIntensity = 0.9;
+                        } else {
+                            o.material.emissive.setHex(0x000000);
+                            o.material.emissiveIntensity = 0;
+                        }
+                    }
+                }
+            });
+
+            // UI button icon update
+            const btn = document.getElementById('btn-daynight');
+            if(btn) btn.innerText = isNight ? '☾' : '☀';
+        }
+
+        function toggleDayNight() {
+            isNight = !isNight;
+            applyDayNightState();
         }
 
         function toggleRain() { isRainingRoses = !isRainingRoses; }
